@@ -1,0 +1,339 @@
+#include <Arduino.h>
+
+// Definiciones de pines
+#define e1 13
+#define e2 12
+#define e3 14
+#define e4 27
+#define e5 26
+#define e6 25
+#define e7 19
+#define e8 18
+#define eA 15
+#define b1 4
+#define b2 5
+#define b3 21
+
+portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+
+hw_timer_t *timer0 = NULL;
+
+volatile int reset;
+volatile int incremento;
+volatile int decremento;
+uint8_t contadorBot;
+uint8_t contadorTime;
+
+// Variables de anti-rebote
+unsigned long ultima_lectura_b1 = 0;
+unsigned long ultima_lectura_b2 = 0;
+unsigned long ultima_lectura_b3 = 0;
+unsigned long tiempo_rebote = 50; // Tiempo de rebote en milisegundos
+
+bool estado_previo_b1 = LOW;
+bool estado_previo_b2 = LOW;
+bool estado_previo_b3 = LOW;
+
+void initTimer0();
+void IRAM_ATTR Timer0_ISR(void);
+void IRAM_ATTR BTN1_ISR();
+void IRAM_ATTR BTN2_ISR();
+void IRAM_ATTR BTN3_ISR();
+
+void setup() {
+  // Inicialización del timer
+  initTimer0();
+  
+  // Configuración de interrupciones de los botones
+  attachInterrupt(b1, BTN1_ISR, CHANGE);
+  attachInterrupt(b2, BTN2_ISR, CHANGE);
+  attachInterrupt(b3, BTN3_ISR, CHANGE);
+
+  // Configuración de pines
+  pinMode(e1, OUTPUT);
+  pinMode(e2, OUTPUT);
+  pinMode(e3, OUTPUT);
+  pinMode(e4, OUTPUT);
+  pinMode(e5, OUTPUT);
+  pinMode(e6, OUTPUT);
+  pinMode(e7, OUTPUT);
+  pinMode(e8, OUTPUT);
+  pinMode(eA, OUTPUT);
+
+  pinMode(b1, INPUT_PULLDOWN);
+  pinMode(b2, INPUT_PULLDOWN);
+  pinMode(b3, INPUT_PULLDOWN);
+
+  digitalWrite(e1, LOW);
+  digitalWrite(e2, LOW);
+  digitalWrite(e3, LOW);
+  digitalWrite(e4, LOW);
+  digitalWrite(e5, LOW);
+  digitalWrite(e6, LOW);
+  digitalWrite(e7, LOW);
+  digitalWrite(e8, LOW);
+  digitalWrite(eA, LOW);
+
+  digitalWrite(b1, LOW);
+  digitalWrite(b2, LOW);
+  digitalWrite(b3, LOW);
+}
+
+void loop() {
+  incremento = digitalRead(b1);
+  decremento = digitalRead(b2);
+  reset = digitalRead(b3);
+
+  if (contadorBot == contadorTime) {
+    digitalWrite(eA, HIGH);
+    delay(100);
+    digitalWrite(eA, LOW);
+  }
+
+  switch (contadorBot) {
+    case 0:
+      digitalWrite(e1, LOW);
+      digitalWrite(e2, LOW);
+      digitalWrite(e3, LOW);
+      digitalWrite(e4, LOW);
+      break;
+    case 1:
+      digitalWrite(e1, HIGH);
+      digitalWrite(e2, LOW);
+      digitalWrite(e3, LOW);
+      digitalWrite(e4, LOW);
+      break;
+    case 2:
+      digitalWrite(e1, LOW);
+      digitalWrite(e2, HIGH);
+      digitalWrite(e3, LOW);
+      digitalWrite(e4, LOW);
+      break;
+    case 3:
+      digitalWrite(e1, HIGH);
+      digitalWrite(e2, HIGH);
+      digitalWrite(e3, LOW);
+      digitalWrite(e4, LOW);
+      break;
+    case 4:
+      digitalWrite(e1, LOW);
+      digitalWrite(e2, LOW);
+      digitalWrite(e3, HIGH);
+      digitalWrite(e4, LOW);
+      break;
+    case 5:
+      digitalWrite(e1, HIGH);
+      digitalWrite(e2, LOW);
+      digitalWrite(e3, HIGH);
+      digitalWrite(e4, LOW);
+      break;
+    case 6:
+      digitalWrite(e1, LOW);
+      digitalWrite(e2, HIGH);
+      digitalWrite(e3, HIGH);
+      digitalWrite(e4, LOW);
+      break;
+    case 7:
+      digitalWrite(e1, HIGH);
+      digitalWrite(e2, HIGH);
+      digitalWrite(e3, HIGH);
+      digitalWrite(e4, LOW);
+      break;
+    case 8:
+      digitalWrite(e1, LOW);
+      digitalWrite(e2, LOW);
+      digitalWrite(e3, LOW);
+      digitalWrite(e4, HIGH);
+      break;
+    case 9:
+      digitalWrite(e1, HIGH);
+      digitalWrite(e2, LOW);
+      digitalWrite(e3, LOW);
+      digitalWrite(e4, HIGH);
+      break;
+    case 10:
+      digitalWrite(e1, LOW);
+      digitalWrite(e2, HIGH);
+      digitalWrite(e3, LOW);
+      digitalWrite(e4, HIGH);
+      break;
+    case 11:
+      digitalWrite(e1, HIGH);
+      digitalWrite(e2, HIGH);
+      digitalWrite(e3, LOW);
+      digitalWrite(e4, HIGH);
+      break;
+    case 12:
+      digitalWrite(e1, LOW);
+      digitalWrite(e2, LOW);
+      digitalWrite(e3, HIGH);
+      digitalWrite(e4, HIGH);
+      break;
+    case 13:
+      digitalWrite(e1, HIGH);
+      digitalWrite(e2, LOW);
+      digitalWrite(e3, HIGH);
+      digitalWrite(e4, HIGH);
+      break;
+    case 14:
+      digitalWrite(e1, LOW);
+      digitalWrite(e2, HIGH);
+      digitalWrite(e3, HIGH);
+      digitalWrite(e4, HIGH);
+      break;
+    case 15:
+      digitalWrite(e1, HIGH);
+      digitalWrite(e2, HIGH);
+      digitalWrite(e3, HIGH);
+      digitalWrite(e4, HIGH);
+      break;
+  }
+
+  switch (contadorTime) {
+    case 0:
+      digitalWrite(e5, LOW);
+      digitalWrite(e6, LOW);
+      digitalWrite(e7, LOW);
+      digitalWrite(e8, LOW);
+      break;
+    case 1:
+      digitalWrite(e5, HIGH);
+      digitalWrite(e6, LOW);
+      digitalWrite(e7, LOW);
+      digitalWrite(e8, LOW);
+      break;
+    case 2:
+      digitalWrite(e5, LOW);
+      digitalWrite(e6, HIGH);
+      digitalWrite(e7, LOW);
+      digitalWrite(e8, LOW);
+      break;
+    case 3:
+      digitalWrite(e5, HIGH);
+      digitalWrite(e6, HIGH);
+      digitalWrite(e7, LOW);
+      digitalWrite(e8, LOW);
+      break;
+    case 4:
+      digitalWrite(e5, LOW);
+      digitalWrite(e6, LOW);
+      digitalWrite(e7, HIGH);
+      digitalWrite(e8, LOW);
+      break;
+    case 5:
+      digitalWrite(e5, HIGH);
+      digitalWrite(e6, LOW);
+      digitalWrite(e7, HIGH);
+      digitalWrite(e8, LOW);
+      break;
+    case 6:
+      digitalWrite(e5, LOW);
+      digitalWrite(e6, HIGH);
+      digitalWrite(e7, HIGH);
+      digitalWrite(e8, LOW);
+      break;
+    case 7:
+      digitalWrite(e5, HIGH);
+      digitalWrite(e6, HIGH);
+      digitalWrite(e7, HIGH);
+      digitalWrite(e8, LOW);
+      break;
+    case 8:
+      digitalWrite(e5, LOW);
+      digitalWrite(e6, LOW);
+      digitalWrite(e7, LOW);
+      digitalWrite(e8, HIGH);
+      break;
+    case 9:
+      digitalWrite(e5, HIGH);
+      digitalWrite(e6, LOW);
+      digitalWrite(e7, LOW);
+      digitalWrite(e8, HIGH);
+      break;
+    case 10:
+      digitalWrite(e5, LOW);
+      digitalWrite(e6, HIGH);
+      digitalWrite(e7, LOW);
+      digitalWrite(e8, HIGH);
+      break;
+    case 11:
+      digitalWrite(e5, HIGH);
+      digitalWrite(e6, HIGH);
+      digitalWrite(e7, LOW);
+      digitalWrite(e8, HIGH);
+      break;
+    case 12:
+      digitalWrite(e5, LOW);
+      digitalWrite(e6, LOW);
+      digitalWrite(e7, HIGH);
+      digitalWrite(e8, HIGH);
+      break;
+    case 13:
+      digitalWrite(e5, HIGH);
+      digitalWrite(e6, LOW);
+      digitalWrite(e7, HIGH);
+      digitalWrite(e8, HIGH);
+      break;
+    case 14:
+      digitalWrite(e5, LOW);
+      digitalWrite(e6, HIGH);
+      digitalWrite(e7, HIGH);
+      digitalWrite(e8, HIGH);
+      break;
+    case 15:
+      digitalWrite(e5, HIGH);
+      digitalWrite(e6, HIGH);
+      digitalWrite(e7, HIGH);
+      digitalWrite(e8, HIGH);
+      break;
+  }
+}
+
+void IRAM_ATTR Timer0_ISR(void) {
+  contadorTime++;
+  if (contadorTime > 15) {
+    contadorTime = 0;
+  }
+}
+
+void IRAM_ATTR BTN1_ISR() {
+  unsigned long tiempo_actual = esp_timer_get_time() / 1000;
+  if ((tiempo_actual - ultima_lectura_b1) > tiempo_rebote) {
+    portENTER_CRITICAL_ISR(&mux);
+    contadorBot++;
+    if (contadorBot > 15) {
+      contadorBot = 0;
+    }
+    ultima_lectura_b1 = tiempo_actual;
+    portEXIT_CRITICAL_ISR(&mux);
+  }
+}
+
+void IRAM_ATTR BTN2_ISR() {
+  unsigned long tiempo_actual = esp_timer_get_time() / 1000;
+  if ((tiempo_actual - ultima_lectura_b2) > tiempo_rebote) {
+    portENTER_CRITICAL_ISR(&mux);
+    if (contadorBot > 0) {
+      contadorBot--;
+    }
+    ultima_lectura_b2 = tiempo_actual;
+    portEXIT_CRITICAL_ISR(&mux);
+  }
+}
+
+void IRAM_ATTR BTN3_ISR() {
+  unsigned long tiempo_actual = esp_timer_get_time() / 1000;
+  if ((tiempo_actual - ultima_lectura_b3) > tiempo_rebote) {
+    portENTER_CRITICAL_ISR(&mux);
+    contadorTime = 0;
+    ultima_lectura_b3 = tiempo_actual;
+    portEXIT_CRITICAL_ISR(&mux);
+  }
+}
+
+void initTimer0() {
+  timer0 = timerBegin(0, 80, true);
+  timerAttachInterrupt(timer0, &Timer0_ISR, true);
+  timerAlarmWrite(timer0, 1000000, true);
+  timerAlarmEnable(timer0);
+}
